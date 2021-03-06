@@ -1,9 +1,84 @@
 ---
 title: "Effect of Population Density on Life Expectancy"
-author: "YOUR NAME"
+author: "Clara Fong"
 date: "`r lubridate::today()`"
 output: github_document
 ---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, include=TRUE)
+
+library(tidyverse)
+library(geonames)
+library(here)
+library(countrycode)
+
+#library(forcats)
+library(broom)
+#library(wbstats)
+#library(wordcloud)
+library(tidytext)
+#library(viridis)
+library(rcfss)
+
+set.seed(1234)
+theme_set(theme_minimal())
+```
+
+# Exploring Gap Minder Data
+
+## Population and Life Expectancy
+
+```{r load data}
+gapminder <- gapminder::gapminder 
+
+#ggplot(gapminder, mapping=aes(x = pop, y = lifeExp)) +
+ # geom_point(alpha = 0.3) +
+#  geom_smooth()
+```
+
+
+```{r r profile}
+# Creating an R.profile
+file.edit(here::here(".Rprofile"))
+
+# Get key from R.profile
+key <- getOption("geonamesUsername")
+```
+
+
+```{r country info, include=FALSE}
+# Loading geonames info
+countryInfo <- GNcountryInfo()
+```
+
+
+```{r match code key}
+
+# Match `isoAlpha3` format in iso3c from geonames to country.name format in gapminder
+countryInfo <- countryInfo %>% 
+  select(areaInSqKm, 
+         isoAlpha3) %>% 
+  mutate(country = countrycode(isoAlpha3, 
+         origin = 'iso3c', 
+         destination = 'country.name')) %>% 
+  filter(isoAlpha3 != "XKX") %>% 
+  as.numeric(unlist("areaInSqKm"))
+  
+
+# Left-Join `countryInfo` to `gapminder`
+country_merge <- 
+  left_join(gapminder, countryInfo, by = "country") %>% 
+  select(!isoAlpha3) 
+
+country_merge %>% 
+ as.numeric(unlist("areaInSqKm")) %>% 
+  mutate(pop_dense = pop/areaInSqKm)
+```
+
+
+
+
 
 
 ## Session info
