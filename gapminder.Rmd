@@ -12,6 +12,7 @@ library(tidyverse)
 library(geonames)
 library(here)
 library(countrycode)
+library(tidymodels)
 
 #library(forcats)
 library(broom)
@@ -32,9 +33,14 @@ theme_set(theme_minimal())
 ```{r load data}
 gapminder <- gapminder::gapminder 
 
-#ggplot(gapminder, mapping=aes(x = pop, y = lifeExp)) +
- # geom_point(alpha = 0.3) +
-#  geom_smooth()
+gapminder %>% 
+  mutate(pop = pop/1e5) %>% 
+  ggplot(gapminder, mapping=aes(x = pop, y = lifeExp)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth() +
+  scale_x_log10()
+
+#title axes
 ```
 
 
@@ -43,41 +49,60 @@ gapminder <- gapminder::gapminder
 file.edit(here::here(".Rprofile"))
 
 # Get key from R.profile
-key <- getOption("geonamesUsername")
+# key <- getOption("geonamesUsername")
 ```
 
 
 ```{r country info, include=FALSE}
 # Loading geonames info
-countryInfo <- GNcountryInfo()
-```
-
-
-```{r match code key}
+countryInfo <- GNcountryInfo() %>% 
+  as_tibble()
 
 # Match `isoAlpha3` format in iso3c from geonames to country.name format in gapminder
 countryInfo <- countryInfo %>% 
   select(areaInSqKm, 
          isoAlpha3) %>% 
+  filter(isoAlpha3 != "XKX") %>% 
   mutate(country = countrycode(isoAlpha3, 
          origin = 'iso3c', 
-         destination = 'country.name')) %>% 
-  filter(isoAlpha3 != "XKX") %>% 
-  as.numeric(unlist("areaInSqKm"))
-  
+         destination = 'country.name'),
+         areaInSqKm = as.numeric(areaInSqKm))
+```
+
+
+```{r left join}
 
 # Left-Join `countryInfo` to `gapminder`
-country_merge <- 
-  left_join(gapminder, countryInfo, by = "country") %>% 
+country_merge <- left_join(gapminder, countryInfo, by = "country") %>% 
   select(!isoAlpha3) 
 
+# Create new column with population density
 country_merge %>% 
- as.numeric(unlist("areaInSqKm")) %>% 
-  mutate(pop_dense = pop/areaInSqKm)
+  mutate(pop_den = pop/areaInSqKm) # create new col for population density
 ```
 
 
 
+## Analysis of Data
+```{r analysis}
+
+#ggplot(country_merge, mapping=aes(x = pop_den, y = lifeExp)) +
+ # geom_point(alpha = 0.3) +
+  #geom_smooth() +
+#  scale_x_log10()
+
+
+#lm(pop_den ~ lifeExp, data = country_merge) %>% 
+ # tidy()
+
+
+#lm_mod <- linear_reg(mode = "regression") %>% 
+ # set_engine("lm")
+
+#lm_fit <- lm_mod %>% 
+ # fit(pop_den ~ lifeExp,
+  #    data = country_merge)
+```
 
 
 
