@@ -25,6 +25,9 @@ library(rtimes)
 ```
 
 ```{r}
+out <- as_search(q = "migration", begin_date = "20000101", end_date = '20210306')
+
+
 key <- getOption("nyt_key")
 
 base.url <- "https://api.nytimes.com/svc/mostpopular/v2/emailed/{period}.json"

@@ -44,21 +44,15 @@ gapminder %>%
 ```
 
 
-```{r r profile}
+```{r country info, include=FALSE}
 # Creating an R.profile
 file.edit(here::here(".Rprofile"))
 
-# Get key from R.profile
-# key <- getOption("geonamesUsername")
-```
-
-
-```{r country info, include=FALSE}
 # Loading geonames info
 countryInfo <- GNcountryInfo() %>% 
   as_tibble()
 
-# Match `isoAlpha3` format in iso3c from geonames to country.name format in gapminder
+# Match country name in geonames to gapminder, from iso3c format to country.name format
 countryInfo <- countryInfo %>% 
   select(areaInSqKm, 
          isoAlpha3) %>% 
@@ -77,31 +71,23 @@ country_merge <- left_join(gapminder, countryInfo, by = "country") %>%
   select(!isoAlpha3) 
 
 # Create new column with population density
-country_merge %>% 
+country_merge <- country_merge %>% 
   mutate(pop_den = pop/areaInSqKm) # create new col for population density
 ```
 
 
-
-## Analysis of Data
 ```{r analysis}
 
-#ggplot(country_merge, mapping=aes(x = pop_den, y = lifeExp)) +
- # geom_point(alpha = 0.3) +
-  #geom_smooth() +
-#  scale_x_log10()
+ggplot(country_merge, mapping=aes(x = pop_den, y = lifeExp)) +
+  geom_point(alpha = 0.4, aes(color = continent)) +
+  geom_smooth(color = "black", alpha = 0.3) +
+  scale_x_log10()
 
+# this is not a super linear function, but we could model a linear function
 
-#lm(pop_den ~ lifeExp, data = country_merge) %>% 
- # tidy()
-
-
-#lm_mod <- linear_reg(mode = "regression") %>% 
- # set_engine("lm")
-
-#lm_fit <- lm_mod %>% 
- # fit(pop_den ~ lifeExp,
-  #    data = country_merge)
+#using base R to generate a linear regression
+lm(pop_den ~ lifeExp, data = country_merge) %>% 
+  tidy()
 ```
 
 
