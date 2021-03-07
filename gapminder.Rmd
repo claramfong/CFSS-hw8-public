@@ -57,6 +57,12 @@ Recreating the graph from our [assignment page](https://cfss.uchicago.edu/homewo
 
 ```{r country info, include=FALSE}
 
+# Created R profile
+#file.edit(here::here(".Rprofile"))
+
+#entered in key from geonames after creating account using following:
+## options(geonamesUsername = "YOURUSERNAMEHERE")
+
 # Loading geonames info from `geonames` package and .Rprofile
 countryInfo <- GNcountryInfo() %>% 
   as_tibble()

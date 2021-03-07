@@ -2,21 +2,23 @@
 title: "Extracting Data from NYT Developers Network"
 author: "Clara Fong"
 date: "`r lubridate::today()`"
-output: git_document
+output: 
+  git_document:
+    toc: yes
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, include = TRUE)
-```
 
-```{r}
 # Load Packages
 library(tidyverse)
 library(stringr)
 library(httr)
 library(jsonlite)
 library(lubridate)
+```
 
+```{r}
 # didn't work to use intall.packages("rtimes") because didn't work with current r version
 #so instead downloaded development version from github
 #install.packages("devtools")
