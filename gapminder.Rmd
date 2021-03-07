@@ -2,10 +2,13 @@
 title: "Effect of Population Density on Life Expectancy"
 author: "Clara Fong"
 date: "`r lubridate::today()`"
-output: github_document
+output: 
+  github_document:
+    toc: yes
 ---
 
 ```{r setup, include = FALSE}
+
 knitr::opts_chunk$set(echo = FALSE, include=TRUE)
 
 library(tidyverse)
@@ -22,33 +25,39 @@ library(tidytext)
 #library(viridis)
 library(rcfss)
 
-set.seed(1234)
-theme_set(theme_minimal())
+set.seed(1234) # set seeds
+theme_set(theme_minimal()) # set theme
 ```
 
 # Exploring Gap Minder Data
 
+Below are two graphs: one is a scatter plot of the total population of all countries and their average life expectancy, and the second graph is a scatter plot the population *density* and total life expectancy. The final statistical output is a basic linear regression model that attempts to predict life expectancy based on population density outcomes.
+
+
 ## Population and Life Expectancy
 
-```{r load data}
+```{r load data, message = FALSE}
+
 gapminder <- gapminder::gapminder 
 
+#Re creating graph from assignment
 gapminder %>% 
   mutate(pop = pop/1e5) %>% 
   ggplot(gapminder, mapping=aes(x = pop, y = lifeExp)) +
   geom_point(alpha = 0.3) +
   geom_smooth() +
-  scale_x_log10()
+  scale_x_log10() +
+  labs(title = "Scatter plot of Population Size and Life Expectancy",
+       x = "Population, in millions (log scale 10)",
+       y = "Average Life Expectancy")
 
-#title axes
 ```
 
+Recreating the graph from our [assignment page](https://cfss.uchicago.edu/homework/webdata/), we can see that generally, as population increases, so does average life expectancy. The assignment asks us to use `geonames` data to conduct this same scatterplot on population *density* and average life expectancy. That output can be found in the next section below.
 
 ```{r country info, include=FALSE}
-# Creating an R.profile
-file.edit(here::here(".Rprofile"))
 
-# Loading geonames info
+# Loading geonames info from `geonames` package and .Rprofile
 countryInfo <- GNcountryInfo() %>% 
   as_tibble()
 
@@ -68,28 +77,83 @@ countryInfo <- countryInfo %>%
 
 # Left-Join `countryInfo` to `gapminder`
 country_merge <- left_join(gapminder, countryInfo, by = "country") %>% 
-  select(!isoAlpha3) 
+  select(!isoAlpha3) # Not really necessary, but just nice to clean up the final merged df
 
 # Create new column with population density
 country_merge <- country_merge %>% 
   mutate(pop_den = pop/areaInSqKm) # create new col for population density
 ```
 
+## Population Desnity and Life Expectancy
 
-```{r analysis}
+```{r analysis, message = FALSE, warning = FALSE}
 
+# New plot of pop_den and lifeExp
 ggplot(country_merge, mapping=aes(x = pop_den, y = lifeExp)) +
   geom_point(alpha = 0.4, aes(color = continent)) +
   geom_smooth(color = "black", alpha = 0.3) +
-  scale_x_log10()
-
-# this is not a super linear function, but we could model a linear function
-
-#using base R to generate a linear regression
-lm(pop_den ~ lifeExp, data = country_merge) %>% 
-  tidy()
+  scale_x_log10() +
+  labs(title = "Scatter plot of Population Density and Life Expectancy",
+       x = "Population Density (Total Population/Area in sqaure Km)",
+       y = "Average Life Expectancy",
+       colour = "Continent")
 ```
 
+As we can see, this output is not perfectly linear, and certainly not as linear as the first plot (population and life expectancy). Below, we can also look at how each plot compares to each other by continent:
+
+```{r analysis continent, message = FALSE, warning = FALSE}
+
+ggplot(country_merge, mapping=aes(x = pop_den, y = lifeExp)) +
+  geom_point(alpha = 0.4, aes(color = continent)) +
+  geom_smooth(color = "black", size=0.1) +
+  scale_x_log10() +
+  labs(title = "Scatter plot of Population Density and Life Expectancy",
+       subtitle = "By continent",
+       x = "Population Density (Total Population/Area in sqaure Km)",
+       y = "Average Life Expectancy",
+       colour = "Continent") +
+  facet_wrap(~ continent)
+
+```
+
+From these plots, it is clear that this relationship differs across the continents based on both data availability and overall trends. For example, Asia shows the most close to linear trend between population dendity and life expectancy, but Europe has an opposite effect after a certain population size.
+
+Another way we can preliminarily analyze the data is to see to whether we can model statistically significant a linear regression using the population density and life expectancy data, even if the total data set relationship is not perfectly linear. 
+
+Below is the output of a basic linear regression model calculated in base R:
+
+```{r stat model 1}
+#using base R to generate a linear regression
+lm_pop_den <- lm(lifeExp ~ pop_den, data = country_merge) %>% 
+  tidy()
+
+knitr::kable(lm_pop_den,
+              col.names = c('Term', 'Estimate', 'Standard Error', 'Statistic', 'P-Value'))
+```
+
+With a p-value at <0.01, this model is statistically significant and seems to support a postitive linear relationship between the two variables. We can also test this same linear regression using `tidymodels` to test and predict on the same data then calculate the RMSE for the model.
+
+```{r state model 2}
+# Create the linear regression model
+lm_mod <- linear_reg() %>% 
+  set_engine("lm") 
+
+# Fit the Model
+lm_fit <- lm_mod %>% 
+  fit(lifeExp ~ pop_den,
+      data = country_merge)
+  
+# Using model to predict current data
+lm_fit <- lm_fit %>%
+  predict(new_data = country_merge) %>% 
+  mutate(true_data = country_merge$lifeExp) %>% 
+rmse(truth = true_data, estimate = .pred) # Calculating Root Mean Square Error
+
+knitr::kable(lm_fit,
+             col.names = c('Output', 'Estimator', 'Estimate'))
+```
+
+This root mean squared tells us that the model's prediction has an average deviation of around `r round(lm_fit$.estimate, 2)`.
 
 
 ## Session info
