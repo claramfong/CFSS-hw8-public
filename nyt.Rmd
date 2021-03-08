@@ -30,31 +30,59 @@ out <- as_search(q = "migrant", begin_date = "20000101", end_date = '20210306')
 ```
 
 ```{r}
+
+#create an Rprofile page to store API keys using
+#file.edit(here::here(".Rprofile"))
+#enter your NYT API key (available here: https://developer.nytimes.com/)
+#it should look like:
+  #options(nyt_key = "YOURKEYHERE")
+
+# Set relevant parameteres for GET request
 key <- getOption("nyt_key")
 
 base.url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
 search_term <- "migrant"
-facet_field <- "true"
 filter <- 'news_desk:("Foreign")'
+begin <- '20000101'
+end <- '20201231'
 
-#&facet_field=day_of_week&facet=true&begin_date=20120101&end_date=20120101
-
+# Putting together GET request
 articles <- GET(base.url, query = list(`q` = search_term,
                                        `fq` = filter,
+                                       `begin_date` = begin,
+                                       `end_date` = end,
                                        `api-key` = key))
 
 # Checking to see if URL created properly
-#articles$url
+articles$url
 
-content(articles, type = "text") %>%
-  # print the contents in a clear structure
-  prettify()
-
-
+#Make a tibble of articles
 response_df <- content(articles) %>%
     as_tibble()
 
+response <- httr::content(articles, "text")
 
+
+# Convert JSON response to df
+library(jsonlite)
+response_df_1 <- fromJSON(response, simplifyDataFrame = TRUE, flatten = TRUE)
+str(response_df, max.level = 2)
+
+# See all items
+names(response_df_1)
+
+# This is boring
+response_df_1$status
+
+# So is this
+response_df_1$copyright
+
+# This is what we want!
+names(response_df_1$response)
+
+names(response_df_1$response$docs)
+
+docs <- response_df_1$response$docs
 
 ```
 
