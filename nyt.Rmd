@@ -3,7 +3,7 @@ title: "Extracting Data from NYT Developers Network"
 author: "Clara Fong"
 date: "`r lubridate::today()`"
 output: 
-  git_document:
+  github_document:
     toc: yes
 ---
 
@@ -18,32 +18,30 @@ library(jsonlite)
 library(lubridate)
 ```
 
-```{r}
+```{r a note on rtimes package}
+
 # didn't work to use intall.packages("rtimes") because didn't work with current r version
 #so instead downloaded development version from github
 #install.packages("devtools")
 #devtools::install_github("ropengov/rtimes")
 library(rtimes)
-
-out <- as_search(q = "migrant", begin_date = "20000101", end_date = '20210306')
-
 ```
 
-```{r}
+```{r single request, include = FALSE}
 
-#create an Rprofile page to store API keys using
+# Create an Rprofile page to store API keys using:
 #file.edit(here::here(".Rprofile"))
-#enter your NYT API key (available here: https://developer.nytimes.com/)
-#it should look like:
-  #options(nyt_key = "YOURKEYHERE")
 
-# Set relevant parameteres for GET request
-key <- getOption("nyt_key")
+# Enter your NYT API key (available here: https://developer.nytimes.com/)
+  #it should look like: options(nyt_key = "YOURKEYHERE")
+
+# Set relevant parameters for GET request
+key <- getOption("nyt_key") 
 
 base.url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
 search_term <- "migrant"
 filter <- 'news_desk:("Foreign")'
-begin <- '20000101'
+begin <- '20150101'
 end <- '20201231'
 
 # Putting together GET request
@@ -54,37 +52,72 @@ articles <- GET(base.url, query = list(`q` = search_term,
                                        `api-key` = key))
 
 # Checking to see if URL created properly
-articles$url
+  #articles$url
 
-#Make a tibble of articles
-response_df <- content(articles) %>%
-    as_tibble()
+# Convert JSON lists into single text line
+response <- content(articles, "text")
 
-response <- httr::content(articles, "text")
+# Convert this text to df
+response_df <- fromJSON(response, simplifyDataFrame = TRUE, flatten = TRUE) # code borrowed from: https://plsc-31101.github.io/course/collecting-data-from-the-web.html#writing-api-queries
+str(response_df, max.level = 2) #we can see that we have a lite of three, with our df stored under `docs`
 
+# Extract hits, see that 2750 articles match my parameters
+response_df$response$meta
 
-# Convert JSON response to df
-library(jsonlite)
-response_df_1 <- fromJSON(response, simplifyDataFrame = TRUE, flatten = TRUE)
-str(response_df, max.level = 2)
+# Want to pull out our df from the `docs` object
+names(response_df$response$docs) # these are our column names for each 10 articles
 
-# See all items
-names(response_df_1)
-
-# This is boring
-response_df_1$status
-
-# So is this
-response_df_1$copyright
-
-# This is what we want!
-names(response_df_1$response)
-
-names(response_df_1$response$docs)
-
-docs <- response_df_1$response$docs
-
+# Store df in an object
+docs <- response_df$response$docs
 ```
+
+```{r request function, include = FALSE}
+
+# Do what we did above, but try to pull all articles since the above measure can only pull ten at a time
+
+# Create function for specified parameters above
+nyt_api <- function(page){
+  base.url = "https://api.nytimes.com/svc/search/v2/articlesearch.json"
+    # Send GET request
+    articles <- GET(base.url, query = list(`q` = search_term,
+                                       `fq` = filter,
+                                       `begin_date` = begin,
+                                       `end_date` = end,
+                                       `api-key` = key,
+                                       `page` = page)) #using same GET request, only difference is adding page
+    
+    # Parse response to JSON
+    response <- content(articles, "text")  
+    response_df <- fromJSON(response, simplifyDataFrame = TRUE, flatten = TRUE) #same as above
+    
+    message(glue::glue("Scraping page: ", as.character(page))) # print message to track progress
+    
+    return(response_df$response$docs) # returns article info stored as df
+}
+```
+
+```{r test function, include=FALSE}
+# Test the function on next set of pages
+docs_1 <- nyt_api(page = 2) # yay it works!
+```
+
+```{r building df, include=FALSE, cache = FALSE}
+
+# Extract total hits
+hits = response_df$response$meta$hits
+
+# Store number of pages 
+pages = ceiling(hits/10)
+
+# Modify function to slow down scraping
+nyt_api_slow <- slowly(f = nyt_api, rate = rate_delay(1))
+
+# Create new df with all articles that match hit using iterative function
+articles_df <- map_dfr(.x = (1:pages), ~nyt_api_slow(page = .))
+```
+
+
+
 
 
 
