@@ -7,6 +7,10 @@ output:
     toc: yes
 ---
 
+## Summary of Data
+
+I wanted to look at New York Times articles related to migrants, broadly speaking. I was interested to 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, include = TRUE)
 
@@ -16,6 +20,10 @@ library(stringr)
 library(httr)
 library(jsonlite)
 library(lubridate)
+library(ggplot2)
+library(tidyr)
+
+theme_set(theme_minimal())
 ```
 
 ```{r a note on rtimes package}
@@ -52,14 +60,14 @@ articles <- GET(base.url, query = list(`q` = search_term,
                                        `api-key` = key))
 
 # Checking to see if URL created properly
-  #articles$url
+  #articles$url <- commenting it out because it has my api key in the output
 
 # Convert JSON lists into single text line
 response <- content(articles, "text")
 
 # Convert this text to df
 response_df <- fromJSON(response, simplifyDataFrame = TRUE, flatten = TRUE) # code borrowed from: https://plsc-31101.github.io/course/collecting-data-from-the-web.html#writing-api-queries
-str(response_df, max.level = 2) #we can see that we have a lite of three, with our df stored under `docs`
+str(response_df, max.level = 2) #we can see that we have a list of three, with our df stored under `docs`
 
 # Extract hits, see that 2750 articles match my parameters
 response_df$response$meta
@@ -94,9 +102,7 @@ nyt_api <- function(page){
     
     return(response_df$response$docs) # returns article info stored as df
 }
-```
 
-```{r test function, include=FALSE}
 # Test the function on next set of pages
 docs_1 <- nyt_api(page = 2) # yay it works!
 ```
@@ -117,7 +123,56 @@ articles_df <- map_dfr(.x = (1:pages), ~nyt_api_slow(page = .))
 ```
 
 
+```{r data cleaning}
+# Main df
+cleaned_articles_df <- articles_df %>% 
+  select(snippet,
+         lead_paragraph,
+         pub_date,
+         headline.main,
+         subsection_name) %>% 
+  filter(subsection_name != "What in the World",
+         subsection_name != "Politics",
+         subsection_name == recode(subsection_name, Canada = "Americas"))
+
+# Also want to look at the keywords list and make it a df on its own
+keywords_df <- articles_df %>% 
+  unnest_longer(col = keywords) %>% 
+  select(headline.main, keywords)
+
+# keywords saved as a matrix within df, so convert all back to df
+keywords_df <- do.call(data.frame, keywords_df) %>% 
+  #https://stackoverflow.com/questions/30896605/dataframe-within-dataframe
+  pivot_wider(names_from = keywords.name, values_from = keywords.value)
+
+test <- articles_df %>% 
+  unnest_longer(col = keywords)
+
+test1 <- test[,"keywords"]
+
+pivot_longer(cols = c(`1960`:`2019`), names_to = "year", values_to = "values") %>%
+    pivot_wider(id_cols = -indict_name,
+                names_from = indict_code, 
+                values_from = values)
 
 
+```
 
+```{r analysis1}
+
+#Distribution of Migration-Related News by Continental Region
+cleaned_articles_df %>% 
+  ggplot() +
+  geom_bar(mapping = aes(x = subsection_name, fill = subsection_name)) +
+  scale_fill_brewer(palette = "Dark2")
+
+```
+
+This simple data visualization shows us the frequency of events relating to migrants and migration reported by the New York Times int he past five years. Unsurprisingly, the highest count is in Europe, likely resulting to the migrant crisis during the Arab Spring movement, but it is interesting to note that Americas and Asia Pacific have relatively similar frequency, so it might be worth looking deeper into what are the kinds of stories being talked about.
+
+
+```{r analysis2}
+# Frequency of Migrant Articles over time
+
+```
 
