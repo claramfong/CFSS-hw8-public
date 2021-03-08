@@ -5,11 +5,8 @@ date: "`r lubridate::today()`"
 output: 
   github_document:
     toc: yes
+    toc_depth: 3
 ---
-
-## Summary of Data
-
-I wanted to look at New York Times articles related to migrants, broadly speaking. I was interested to 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, include = TRUE)
@@ -22,18 +19,33 @@ library(jsonlite)
 library(lubridate)
 library(ggplot2)
 library(tidyr)
+library(tidymodels)
 
 theme_set(theme_minimal())
+
+set.seed(1234)
 ```
 
-```{r a note on rtimes package}
+## Summary of Report
 
-# didn't work to use intall.packages("rtimes") because didn't work with current r version
-#so instead downloaded development version from github
-#install.packages("devtools")
-#devtools::install_github("ropengov/rtimes")
-library(rtimes)
-```
+I wanted to look at New York Times articles related to international migrants, broadly speaking. I was interested in understanding what is being discussed in the news with regards to migration, what regions are most popularly reported on, how has that changed over time, and whether or not we could use a logistic model to predict 
+
+
+## Accessing API and Creating Data Frame
+
+### Data Source:
+
+I used the [New York Times Developers API](https://developer.nytimes.com/apis) to build this data frame. After creating an account and reading the documentation on how to submit a query, I was able to filter for all stories in the past five years (2015-2020) relating to migrants. I wanted to specifically look at the Foreign "newsdesk", which is another way to filter for stories because I was curious to see what was being addressed internationally. Details of how I created the data frame and code can be found on my [R markdown file](nyt.Rmd). To convert the `.json` file to a data frame, I leaned heavily on Professor Terman's PLSC 31101 [course website](https://plsc-31101.github.io/course/collecting-data-from-the-web.html#writing-api-queries).
+
+
+### A Note on `rtimes` Package:
+
+I found out that there is a package can automate the query process for the NYT API, but I found it harder to figure out how to make that work than to follow the course instructions on creating a function to select the query myself. Since it could be useful, I have left in my notes about installing the package:
+
+1. I wasn't able to install `rtimes` using `install.packages("rtimes")` because it was not compatible with the version of the R server we are using, so you will need to use the following line of code: `devtools::install_github("ropengov/rtimes")`.
+
+2. The issue I was having was that it wouldn't read my API key even after putting it in my `.Rprofile` using the same documentation as outlined on [this website](https://www.rdocumentation.org/packages/rtimes/versions/0.3.0). 
+
 
 ```{r single request, include = FALSE}
 
@@ -45,7 +57,6 @@ library(rtimes)
 
 # Set relevant parameters for GET request
 key <- getOption("nyt_key") 
-
 base.url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
 search_term <- "migrant"
 filter <- 'news_desk:("Foreign")'
@@ -66,7 +77,7 @@ articles <- GET(base.url, query = list(`q` = search_term,
 response <- content(articles, "text")
 
 # Convert this text to df
-response_df <- fromJSON(response, simplifyDataFrame = TRUE, flatten = TRUE) # code borrowed from: https://plsc-31101.github.io/course/collecting-data-from-the-web.html#writing-api-queries
+response_df <- fromJSON(response, simplifyDataFrame = TRUE, flatten = TRUE) # built code off of: https://plsc-31101.github.io/course/collecting-data-from-the-web.html#writing-api-queries
 str(response_df, max.level = 2) #we can see that we have a list of three, with our df stored under `docs`
 
 # Extract hits, see that 2750 articles match my parameters
@@ -128,16 +139,17 @@ articles_df <- map_dfr(.x = (1:pages), ~nyt_api_slow(page = .))
 cleaned_articles_df <- articles_df %>% 
   select(snippet,
          lead_paragraph,
+         word_count,
          pub_date,
          headline.main,
          subsection_name) %>% 
   filter(subsection_name != "What in the World",
          subsection_name != "Politics",
          subsection_name == recode(subsection_name, Canada = "Americas")) %>% 
-  mutate(date = ymd_hms(pub_date),
-         year = year(date))
-
-
+  mutate(pub_date = ymd_hms(pub_date),
+         year = year(pub_date),
+         subsection_name = as.factor(subsection_name))
+     
 # Also want to look at the keywords list and make it a df on its own
 keywords_df <- articles_df %>% 
   unnest_longer(col = keywords) %>% 
@@ -154,34 +166,144 @@ keywords_df <- do.call(data.frame, keywords_df) %>%
          persons,
          organizations)
 
-#merge into 1 df
-merged_df <- left_join(cleaned_articles_df, keywords_df, by = "headline.main")
+# i didn't end up using this for any analysis but wanted to show that I could further undo the lists within the previous df
+# one problem I faced here is that there were a lot of "NULL" columns and I looked online, it said you can use `fill()` but it didn't accurate fill it because it was not uniformly missing values (since some columns truly has no values), so using `fill()` would fill out columns that didn't align with what was intended.
 
-#test <- keywords_df %>% 
- # fill(glocations, .direction = "down")
-  
 ```
+
+## Data Visualization
+
+### Distribution of Migration-Related News by Continental Region
+
+As a first step at looking at the NYT articles data, I wanted to see what the distribution of article frequency looked like by each continental region.
 
 ```{r analysis1}
 
 #Distribution of Migration-Related News by Continental Region
 cleaned_articles_df %>% 
   ggplot() +
-  geom_line(mapping = aes(x = subsection_name, fill = subsection_name)) +
-  scale_fill_brewer(palette = "Dark2")
+  geom_bar(mapping = aes(x = subsection_name, fill = subsection_name), alpha = 0.8) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(title = "Distribution of Migration-Related News by Continental Region",
+         x = "Continent",
+         y = "Frequency")
 
 ```
 
-This simple data visualization shows us the frequency of events relating to migrants and migration reported by the New York Times int he past five years. Unsurprisingly, the highest count is in Europe, likely resulting to the migrant crisis during the Arab Spring movement, but it is interesting to note that Americas and Asia Pacific have relatively similar frequency, so it might be worth looking deeper into what are the kinds of stories being talked about.
+This simple data visualization shows us the frequency of events relating to migrants and migration reported by the New York Times int he past five years. Unsurprisingly, the highest count is in Europe, likely resulting to the migrant crisis during the Arab Spring movement, but it is interesting to note that the Americas and Asia Pacific have relatively similar frequency, so it might be worth looking deeper into what are the kinds of stories being talked about.
 
 
-```{r analysis2}
+### Frequncy of Migrant Stories Over Time
+
+I also think it's worth exploring how the frequency and length of these stories changed over the past five years, so we can also create another bar plot to look at the frequency of articles relating to migration over the past five years. Furthermore, we can segment this by continent and observe which regions of the world are seeing the most relevance in migration stories.
+
+```{r analysis 2}
 # Frequency of Migrant Articles over time
 cleaned_articles_df %>% 
   ggplot() +
-  geom_bar(mapping = aes(x = year, fill = subsection_name)) +
+  geom_bar(mapping = aes(x = year,  fill = subsection_name), alpha = 0.8) +
+  scale_fill_brewer(palette = "Dark2")
+
+# Facet wrap by continent
+cleaned_articles_df %>% 
+  ggplot() +
+  geom_bar(mapping = aes(x = year, fill = subsection_name), alpha = 0.8) +
   scale_fill_brewer(palette = "Dark2") +
   facet_wrap(~subsection_name)
 
+```
+
+Again, perhaps unexpectedly, Europe has dominated the stories on migration for the past five years and more or less accounts for the decrease in migrant stories since 2015. Australia, the Middle East, and Asia Pacific all see a small uptick in articles during this 2015-2016 period as well. Other than this trend, there's a comparably smaller spike in migration articles in Americas in 2018.
+
+
+### Article Word Count Over Time
+
+Just to add int another continuous variable, it might be interesting to see if word count of these stories have increased or decreased over time. My initial hunch is that as the crisis is just unraveling, journalists are trying to public short bytes of news to capture current events, and as the crisis becomes less novel (albeit still as pressing), there may be longer pieces that emerge from the NYT later in the years. 
+
+```{r analysis 3, message = FALSE}
+
+# How long are these articles and is there a relationship over time? What about by continent?
+ggplot(data = cleaned_articles_df, mapping = aes(x = pub_date, y = word_count)) +
+  geom_point(aes(color = subsection_name), alpha = 0.3) +
+  geom_smooth(size = 0.4, color = "black") +
+  scale_fill_brewer(palette = "Dark2")
+```
+
+This is a pretty flat linear relationship, so we might want to see if we can parse these data points out by each individual continents and observe that relationship.
+
+```{r analysis 4, message = FALSE}
+# Does this differ across continents? Use facet wrap to see
+ggplot(data = cleaned_articles_df, mapping = aes(x = pub_date, y = word_count)) +
+  geom_point(aes(color = subsection_name), alpha = 0.3) +
+  geom_smooth(size = 0.1) +
+  scale_fill_brewer(palette = "Dark2") +
+  facet_wrap(~subsection_name)
+
+```
+
+Generally, there's a somewhat positive linear relationship between all the continents except the Middle East and Asia Pacific. However, it's also worth noting the sheer number of data points in Europe, so below I've attempted to look at Europe as a specific case.
+
+
+### Europe Stories and Word Count
+
+I can also see that there are way more data points from 2015-2016, so we can further narrow in the data to look at just Europe and see if my previous hunch might be true.
+
+```{r analysis 3 pt 2}
+
+cleaned_articles_df %>% 
+  filter(year == 2015 | year == 2016,
+         subsection_name == "Europe") %>%
+ggplot(mapping = aes(x = pub_date, y = word_count)) +
+  geom_point(alpha = 0.5, colour = "skyblue") +
+  geom_smooth(size = 0.4, color = "black")
+```
+
+We can see that there isn't a really solid relationship here between publication date the word count of articles in 2015-2016 for Europe. There is a generally larger frequency of stories form July 2015 to January 2015, however, which makes sense given the time line of the world events.
+
+
+### Estimating a Linear Model
+
+Finally, given that we could see some kind of loose linear relationship between word count and publication year, I thought it might be worth looking into a basic linear relationship between the two.
+
+```{r analysis lin reg}
+
+# Basic Regression -- test a model to see see if pub_date can predict word_count
+lm_base <- lm(word_count ~ pub_date, data = cleaned_articles_df) %>% 
+  tidy()
+
+knitr::kable(lm_base,
+              col.names = c('Term', 'Estimate', 'Standard Error', 'Statistic', 'P-Value'))
+```
+So, a basic model shows us that if we regress `pub_date` on `word_count`, we get a pretty flat, almost zero, estimate (`r lm_base$estimate`), and a P-value of basically zero (`r lm_base$p.value`).
+
+
+As for using this model to predict other points on the data set, we can below see that our RSME is `r lm_fit$.estimate`.
+
+```{r analysis lin reg model}
+# Create the model
+lm_mod <- linear_reg() %>% 
+  set_engine("lm") 
+
+# Fit the Model
+lm_fit <- lm_mod %>% 
+  fit(word_count ~ pub_date,
+      data = cleaned_articles_df)
+  
+# Using model to predict current data
+lm_fit <- lm_fit %>%
+  predict(new_data = cleaned_articles_df) %>% 
+  mutate(true_data = cleaned_articles_df$word_count) %>% 
+rmse(truth = true_data, estimate = .pred) # Calculating Root Mean Square Error
+
+knitr::kable(lm_fit,
+             col.names = c('Output', 'Estimator', 'Estimate'))
+```
+
+
+
+## Session info
+
+```{r, echo = TRUE}
+devtools::session_info()
 ```
 
