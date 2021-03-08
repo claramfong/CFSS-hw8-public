@@ -24,16 +24,37 @@ library(lubridate)
 #install.packages("devtools")
 #devtools::install_github("ropengov/rtimes")
 library(rtimes)
+
+out <- as_search(q = "migrant", begin_date = "20000101", end_date = '20210306')
+
 ```
 
 ```{r}
-out <- as_search(q = "migration", begin_date = "20000101", end_date = '20210306')
-
-
 key <- getOption("nyt_key")
 
-base.url <- "https://api.nytimes.com/svc/mostpopular/v2/emailed/{period}.json"
-search_term <- "'John Mearsheimer'"
+base.url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
+search_term <- "migrant"
+facet_field <- "true"
+filter <- 'news_desk:("Foreign")'
+
+#&facet_field=day_of_week&facet=true&begin_date=20120101&end_date=20120101
+
+articles <- GET(base.url, query = list(`q` = search_term,
+                                       `fq` = filter,
+                                       `api-key` = key))
+
+# Checking to see if URL created properly
+#articles$url
+
+content(articles, type = "text") %>%
+  # print the contents in a clear structure
+  prettify()
+
+
+response_df <- content(articles) %>%
+    as_tibble()
+
+
 
 ```
 
