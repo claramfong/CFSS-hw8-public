@@ -133,7 +133,10 @@ cleaned_articles_df <- articles_df %>%
          subsection_name) %>% 
   filter(subsection_name != "What in the World",
          subsection_name != "Politics",
-         subsection_name == recode(subsection_name, Canada = "Americas"))
+         subsection_name == recode(subsection_name, Canada = "Americas")) %>% 
+  mutate(date = ymd_hms(pub_date),
+         year = year(date))
+
 
 # Also want to look at the keywords list and make it a df on its own
 keywords_df <- articles_df %>% 
@@ -143,19 +146,16 @@ keywords_df <- articles_df %>%
 # keywords saved as a matrix within df, so convert all back to df
 keywords_df <- do.call(data.frame, keywords_df) %>% 
   #https://stackoverflow.com/questions/30896605/dataframe-within-dataframe
-  pivot_wider(names_from = keywords.name, values_from = keywords.value)
+  pivot_wider(names_from = keywords.name, 
+              values_from = keywords.value) %>% 
+  select(!keywords.rank) %>% 
+  select(!keywords.major)
 
-test <- articles_df %>% 
-  unnest_longer(col = keywords)
+#test <- articles_df %>% 
+ # unnest_longer(col = keywords)
 
-test1 <- test[,"keywords"]
-
-pivot_longer(cols = c(`1960`:`2019`), names_to = "year", values_to = "values") %>%
-    pivot_wider(id_cols = -indict_name,
-                names_from = indict_code, 
-                values_from = values)
-
-
+# test1 <- test[,"keywords"]
+  
 ```
 
 ```{r analysis1}
@@ -163,7 +163,7 @@ pivot_longer(cols = c(`1960`:`2019`), names_to = "year", values_to = "values") %
 #Distribution of Migration-Related News by Continental Region
 cleaned_articles_df %>% 
   ggplot() +
-  geom_bar(mapping = aes(x = subsection_name, fill = subsection_name)) +
+  geom_line(mapping = aes(x = subsection_name, fill = subsection_name)) +
   scale_fill_brewer(palette = "Dark2")
 
 ```
@@ -173,6 +173,11 @@ This simple data visualization shows us the frequency of events relating to migr
 
 ```{r analysis2}
 # Frequency of Migrant Articles over time
+cleaned_articles_df %>% 
+  ggplot() +
+  geom_bar(mapping = aes(x = year, fill = subsection_name)) +
+  scale_fill_brewer(palette = "Dark2") +
+  facet_wrap(~subsection_name)
 
 ```
 
