@@ -17,14 +17,6 @@ library(here)
 library(countrycode)
 library(tidymodels)
 
-#library(forcats)
-library(broom)
-#library(wbstats)
-#library(wordcloud)
-library(tidytext)
-#library(viridis)
-library(rcfss)
-
 set.seed(1234) # set seeds
 theme_set(theme_minimal()) # set theme
 ```
