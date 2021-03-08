@@ -148,13 +148,17 @@ keywords_df <- do.call(data.frame, keywords_df) %>%
   #https://stackoverflow.com/questions/30896605/dataframe-within-dataframe
   pivot_wider(names_from = keywords.name, 
               values_from = keywords.value) %>% 
-  select(!keywords.rank) %>% 
-  select(!keywords.major)
+  select(headline.main,
+         glocations,
+         subject,
+         persons,
+         organizations)
 
-#test <- articles_df %>% 
- # unnest_longer(col = keywords)
+#merge into 1 df
+merged_df <- left_join(cleaned_articles_df, keywords_df, by = "headline.main")
 
-# test1 <- test[,"keywords"]
+#test <- keywords_df %>% 
+ # fill(glocations, .direction = "down")
   
 ```
 
