@@ -47,7 +47,7 @@ I found out that there is a package can automate the query process for the NYT A
 2. The issue I was having was that it wouldn't read my API key even after putting it in my `.Rprofile` using the same documentation as outlined on [this website](https://www.rdocumentation.org/packages/rtimes/versions/0.3.0). 
 
 
-```{r single request, include = FALSE, message = FALSE}
+```{r single request, include = FALSE, warning = FALSE, message = FALSE}
 
 # Create an Rprofile page to store API keys using:
 #file.edit(here::here(".Rprofile"))
@@ -167,6 +167,7 @@ keywords_df <- do.call(data.frame, keywords_df) %>%
          organizations)
 
 # i didn't end up using this for any analysis but wanted to show that I could further undo the lists within the previous df
+
 # one problem I faced here is that there were a lot of "NULL" columns and I looked online, it said you can use `fill()` but it didn't accurate fill it because it was not uniformly missing values (since some columns truly has no values), so using `fill()` would fill out columns that didn't align with what was intended.
 
 ```
@@ -228,7 +229,7 @@ Again, perhaps unexpectedly, Europe has dominated the stories on migration for t
 
 ### Article Word Count Over Time
 
-Just to add int another continuous variable, it might be interesting to see if word count of these stories have increased or decreased over time. My initial hunch is that as the crisis is just unraveling, journalists are trying to public short bytes of news to capture current events, and as the crisis becomes less novel (albeit still as pressing), there may be longer pieces that emerge from the NYT later in the years. 
+Just to add in another continuous variable, it might be interesting to see if word count of these stories have increased or decreased over time. My initial hunch is that as the crisis is just unraveling, journalists are trying to public short bytes of news to capture current events, and as the crisis becomes less novel (albeit still as pressing), there may be longer pieces that emerge from the NYT later in the years. 
 
 ```{r analysis 3, message = FALSE}
 
@@ -244,12 +245,12 @@ ggplot(data = cleaned_articles_df, mapping = aes(x = pub_date, y = word_count)) 
 
 ```
 
-This is a pretty flat linear relationship, so we might want to see if we can parse these data points out by each individual continents and observe that relationship.
+This is a pretty flat linear relationship, so we might want to see if we can parse these data points out by each individual continent and observe that relationship.
 
 ```{r analysis 4, message = FALSE}
 # Does this differ across continents? Use facet wrap to see
 ggplot(data = cleaned_articles_df, mapping = aes(x = pub_date, y = word_count)) +
-  geom_point(aes(color = subsection_name), alpha = 0.3) +
+  geom_point(aes(color = subsection_name), alpha = 0.3, size = 0.7) +
   geom_smooth(size = 0.1) +
   scale_fill_brewer(palette = "Dark2") +
   labs(title = "Publication Date and Word Count Scatter Plot (2015-2020)",
@@ -298,7 +299,7 @@ lm_base <- lm(word_count ~ pub_date, data = cleaned_articles_df) %>%
 knitr::kable(lm_base,
               col.names = c('Term', 'Estimate', 'Standard Error', 'Statistic', 'P-Value'))
 ```
-So, a basic model shows us that if we regress `pub_date` on `word_count`, we get a pretty flat, almost zero, estimate (`r lm_base$estimate`), and a P-value of basically zero.
+So, a basic model shows us that if we regress `pub_date` on `word_count`, we get a pretty flat, almost zero, estimate, and a P-value of basically zero.
 
 ```{r analysis lin reg model}
 # Create the model
